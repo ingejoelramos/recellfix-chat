@@ -67,7 +67,7 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${selectedConversation ? 'has-selection' : ''}`}>
       <ConversationList
         selectedId={selectedConversation?.id}
         onSelect={setSelectedConversation}

@@ -230,6 +230,14 @@ export default function ChatView({ conversation, onClose }) {
   return (
     <div className="chat-view">
       <div className="chat-header">
+        <button
+          type="button"
+          className="back-button"
+          onClick={() => onClose?.()}
+          aria-label="Volver a la lista"
+        >
+          ←
+        </button>
         <div className="avatar">
           {(liveConversation.nombre_cliente || liveConversation.numero_whatsapp || '?')
             .charAt(0)
