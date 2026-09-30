@@ -1,10 +1,49 @@
 import { useEffect, useRef, useState } from 'react'
 import { getSupabaseClient } from '../lib/supabaseClient'
 import { getSendWebhookUrl, setSendWebhookUrl } from '../lib/n8nConfig'
+import { markSeen } from '../lib/readTracking'
 
 function formatTime(iso) {
   if (!iso) return ''
   return new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+}
+
+function dateLabel(iso) {
+  const d = new Date(iso)
+  const today = new Date()
+  const yesterday = new Date()
+  yesterday.setDate(today.getDate() - 1)
+
+  if (d.toDateString() === today.toDateString()) return 'Hoy'
+  if (d.toDateString() === yesterday.toDateString()) return 'Ayer'
+  return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+function groupByDay(messages) {
+  const groups = []
+  let currentDay = null
+  let currentGroup = null
+
+  for (const m of messages) {
+    const day = new Date(m.creado_en).toDateString()
+    if (day !== currentDay) {
+      currentDay = day
+      currentGroup = { day, label: dateLabel(m.creado_en), items: [] }
+      groups.push(currentGroup)
+    }
+    currentGroup.items.push(m)
+  }
+  return groups
+}
+
+function bubbleInfo(remitente) {
+  if (remitente === 'cliente') {
+    return { side: 'incoming', label: null }
+  }
+  if (remitente === 'humano') {
+    return { side: 'outgoing outgoing-human', label: null }
+  }
+  return { side: 'outgoing outgoing-bot', label: 'Alex 🤖' }
 }
 
 export default function ChatView({ conversation }) {
@@ -15,6 +54,7 @@ export default function ChatView({ conversation }) {
   const [showWebhookConfig, setShowWebhookConfig] = useState(false)
   const [webhookInput, setWebhookInput] = useState(getSendWebhookUrl())
   const bottomRef = useRef(null)
+  const textareaRef = useRef(null)
 
   useEffect(() => {
     if (!conversation) return
@@ -30,6 +70,7 @@ export default function ChatView({ conversation }) {
       if (active && !error) setMessages(data || [])
     }
     load()
+    markSeen(conversation.id)
 
     const channel = supabase
       .channel(`mensajes-${conversation.id}`)
@@ -46,6 +87,7 @@ export default function ChatView({ conversation }) {
             if (prev.some((m) => m.id === payload.new.id)) return prev
             return [...prev, payload.new]
           })
+          markSeen(conversation.id)
         }
       )
       .subscribe()
@@ -59,6 +101,13 @@ export default function ChatView({ conversation }) {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`
+  }, [draft])
 
   async function handleSend(e) {
     e.preventDefault()
@@ -96,6 +145,14 @@ export default function ChatView({ conversation }) {
       }
     }
     setSending(false)
+    textareaRef.current?.focus()
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSend(e)
+    }
   }
 
   async function handleToggleMode() {
@@ -122,6 +179,8 @@ export default function ChatView({ conversation }) {
       </div>
     )
   }
+
+  const dayGroups = groupByDay(messages)
 
   return (
     <div className="chat-view">
@@ -169,24 +228,34 @@ export default function ChatView({ conversation }) {
       )}
 
       <div className="messages-container">
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            className={`message-bubble ${m.remitente === 'cliente' ? 'incoming' : 'outgoing'}`}
-          >
-            <div className="message-content">{m.contenido}</div>
-            <div className="message-time">{formatTime(m.creado_en)}</div>
+        {dayGroups.map((group) => (
+          <div key={group.day}>
+            <div className="date-separator">
+              <span>{group.label}</span>
+            </div>
+            {group.items.map((m) => {
+              const { side, label } = bubbleInfo(m.remitente)
+              return (
+                <div key={m.id} className={`message-bubble ${side}`}>
+                  {label && <div className="message-sender-label">{label}</div>}
+                  <div className="message-content">{m.contenido}</div>
+                  <div className="message-time">{formatTime(m.creado_en)}</div>
+                </div>
+              )
+            })}
           </div>
         ))}
         <div ref={bottomRef} />
       </div>
 
       <form className="message-input-bar" onSubmit={handleSend}>
-        <input
-          type="text"
+        <textarea
+          ref={textareaRef}
+          rows={1}
           placeholder="Escribe un mensaje"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={handleKeyDown}
         />
         <button type="submit" disabled={sending || !draft.trim()}>
           Enviar

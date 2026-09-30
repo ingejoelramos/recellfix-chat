@@ -212,6 +212,22 @@ input {
   padding: 12px 16px;
   text-align: left;
   color: var(--wa-text);
+  position: relative;
+}
+
+.conversation-name.unread {
+  color: var(--wa-text);
+  font-weight: 700;
+}
+
+.unread-dot {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--wa-green);
 }
 
 .conversation-item:hover,
@@ -379,6 +395,20 @@ input {
   gap: 4px;
 }
 
+.date-separator {
+  display: flex;
+  justify-content: center;
+  margin: 12px 0;
+}
+
+.date-separator span {
+  background: var(--wa-dark);
+  color: var(--wa-text-muted);
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 8px;
+}
+
 .message-bubble {
   max-width: 65%;
   padding: 6px 9px;
@@ -387,6 +417,7 @@ input {
   line-height: 1.4;
   position: relative;
   word-wrap: break-word;
+  margin-bottom: 4px;
 }
 
 .message-bubble.incoming {
@@ -397,8 +428,22 @@ input {
 
 .message-bubble.outgoing {
   align-self: flex-end;
-  background: var(--wa-bubble-out);
   border-top-right-radius: 0;
+}
+
+.message-bubble.outgoing-human {
+  background: var(--wa-bubble-out);
+}
+
+.message-bubble.outgoing-bot {
+  background: #3b3470;
+}
+
+.message-sender-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #b3a6ff;
+  margin-bottom: 2px;
 }
 
 .message-content {
@@ -414,13 +459,18 @@ input {
 
 .message-input-bar {
   display: flex;
+  align-items: flex-end;
   gap: 8px;
   padding: 12px 16px;
   background: var(--wa-panel-header);
   border-top: 1px solid var(--wa-border);
 }
 
-.message-input-bar input {
+.message-input-bar button {
+  height: 40px;
+}
+
+.message-input-bar textarea {
   flex: 1;
   background: var(--wa-dark);
   border: none;
@@ -428,9 +478,13 @@ input {
   padding: 10px 16px;
   color: var(--wa-text);
   font-size: 14px;
+  font-family: inherit;
+  resize: none;
+  max-height: 120px;
+  line-height: 1.4;
 }
 
-.message-input-bar input:focus {
+.message-input-bar textarea:focus {
   outline: none;
 }
 

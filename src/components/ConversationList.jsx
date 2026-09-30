@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getSupabaseClient } from '../lib/supabaseClient'
+import { isUnread } from '../lib/readTracking'
 
 function formatTime(iso) {
   if (!iso) return ''
@@ -89,31 +90,35 @@ export default function ConversationList({ selectedId, onSelect }) {
         {!loading && filtered.length === 0 && (
           <p className="empty-hint">Sin conversaciones todavía.</p>
         )}
-        {filtered.map((c) => (
-          <button
-            key={c.id}
-            className={`conversation-item ${selectedId === c.id ? 'active' : ''}`}
-            onClick={() => onSelect(c)}
-          >
-            <div className="avatar">
-              {(c.nombre_cliente || c.numero_whatsapp || '?').charAt(0).toUpperCase()}
-            </div>
-            <div className="conversation-info">
-              <div className="conversation-row">
-                <span className="conversation-name">
-                  {c.nombre_cliente || c.numero_whatsapp}
-                </span>
-                <span className="conversation-time">{formatTime(c.actualizado_en)}</span>
+        {filtered.map((c) => {
+          const unread = selectedId !== c.id && isUnread(c)
+          return (
+            <button
+              key={c.id}
+              className={`conversation-item ${selectedId === c.id ? 'active' : ''}`}
+              onClick={() => onSelect(c)}
+            >
+              <div className="avatar">
+                {(c.nombre_cliente || c.numero_whatsapp || '?').charAt(0).toUpperCase()}
               </div>
-              <div className="conversation-row">
-                <span className="conversation-number">{c.numero_whatsapp}</span>
-                <span className={`mode-badge ${c.modo === 'humano' ? 'human' : 'bot'}`}>
-                  {c.modo === 'humano' ? 'Humano' : 'Bot'}
-                </span>
+              <div className="conversation-info">
+                <div className="conversation-row">
+                  <span className={`conversation-name ${unread ? 'unread' : ''}`}>
+                    {c.nombre_cliente || c.numero_whatsapp}
+                  </span>
+                  <span className="conversation-time">{formatTime(c.actualizado_en)}</span>
+                </div>
+                <div className="conversation-row">
+                  <span className="conversation-number">{c.numero_whatsapp}</span>
+                  <span className={`mode-badge ${c.modo === 'humano' ? 'human' : 'bot'}`}>
+                    {c.modo === 'humano' ? 'Humano' : 'Bot'}
+                  </span>
+                </div>
               </div>
-            </div>
-          </button>
-        ))}
+              {unread && <span className="unread-dot" />}
+            </button>
+          )
+        })}
       </div>
     </div>
   )
