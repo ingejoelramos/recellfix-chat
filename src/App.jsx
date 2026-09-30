@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getStoredConfig, getSupabaseClient } from './lib/supabaseClient'
+import { getEffectiveConfig, shouldForceSetup, getSupabaseClient } from './lib/supabaseClient'
 import SetupScreen from './components/SetupScreen'
 import LoginScreen from './components/LoginScreen'
 import ConversationList from './components/ConversationList'
@@ -7,7 +7,7 @@ import ChatView from './components/ChatView'
 import './index.css'
 
 function App() {
-  const [configReady, setConfigReady] = useState(!!getStoredConfig())
+  const [configReady, setConfigReady] = useState(!shouldForceSetup() && !!getEffectiveConfig())
   const [session, setSession] = useState(null)
   const [checkingSession, setCheckingSession] = useState(true)
   const [selectedConversation, setSelectedConversation] = useState(null)
