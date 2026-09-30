@@ -2,6 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import { getSupabaseClient } from '../lib/supabaseClient'
 import { isUnread, markSeen } from '../lib/readTracking'
 import { playNotificationSound } from '../lib/notificationSound'
+import {
+  isPushSupported,
+  isPushEnabled,
+  enablePush,
+  disablePush,
+} from '../lib/pushNotifications'
 
 function formatTime(iso) {
   if (!iso) return ''
@@ -24,7 +30,14 @@ export default function ConversationList({ selectedId, onSelect }) {
   const [search, setSearch] = useState('')
   const [showMenu, setShowMenu] = useState(false)
   const [unreadTick, setUnreadTick] = useState(0)
+  const [pushEnabled, setPushEnabled] = useState(false)
+  const [pushBusy, setPushBusy] = useState(false)
   const menuRef = useRef(null)
+
+  useEffect(() => {
+    if (!isPushSupported()) return
+    isPushEnabled().then(setPushEnabled)
+  }, [])
 
   useEffect(() => {
     const supabase = getSupabaseClient()
@@ -117,6 +130,25 @@ export default function ConversationList({ selectedId, onSelect }) {
     await supabase.auth.signOut()
   }
 
+  async function handleTogglePush() {
+    const supabase = getSupabaseClient()
+    setPushBusy(true)
+    try {
+      if (pushEnabled) {
+        await disablePush(supabase)
+        setPushEnabled(false)
+      } else {
+        await enablePush(supabase)
+        setPushEnabled(true)
+      }
+    } catch (err) {
+      alert(err.message || 'No se pudo cambiar el estado de las notificaciones.')
+    } finally {
+      setPushBusy(false)
+      setShowMenu(false)
+    }
+  }
+
   const filtered = conversations.filter((c) => {
     const q = search.trim().toLowerCase()
     if (!q) return true
@@ -144,6 +176,11 @@ export default function ConversationList({ selectedId, onSelect }) {
               <button type="button" onClick={handleMarkAllRead}>
                 Marcar todas como leídas
               </button>
+              {isPushSupported() && (
+                <button type="button" onClick={handleTogglePush} disabled={pushBusy}>
+                  {pushEnabled ? 'Desactivar notificaciones' : 'Activar notificaciones'}
+                </button>
+              )}
               <button type="button" onClick={handleLogout}>
                 Cerrar sesión
               </button>
