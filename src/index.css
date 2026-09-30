@@ -163,45 +163,6 @@ input {
   grid-template-rows: 100dvh;
 }
 
-/* --- Responsive: pantallas angostas (celular) --- */
-@media (max-width: 768px) {
-  .app-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .conversation-list {
-    display: flex;
-  }
-
-  .chat-view {
-    display: none;
-  }
-
-  .app-shell.has-selection .conversation-list {
-    display: none;
-  }
-
-  .app-shell.has-selection .chat-view {
-    display: flex;
-  }
-
-  .back-button {
-    display: block;
-  }
-
-  .chat-header > .link-button.small {
-    display: none;
-  }
-
-  .emoji-picker {
-    max-width: calc(100vw - 32px);
-  }
-
-  .emoji-picker-grid {
-    width: auto;
-  }
-}
-
 /* --- Conversation list --- */
 
 .conversation-list {
@@ -683,4 +644,43 @@ input {
   text-align: center;
   padding: 4px 16px 8px;
   margin: 0;
+}
+
+/* --- Responsive: pantallas angostas (celular) --- */
+@media (max-width: 768px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .conversation-list {
+    display: flex;
+  }
+
+  .chat-view {
+    display: none;
+  }
+
+  .app-shell.has-selection .conversation-list {
+    display: none;
+  }
+
+  .app-shell.has-selection .chat-view {
+    display: flex;
+  }
+
+  .back-button {
+    display: block;
+  }
+
+  .chat-header > .link-button.small {
+    display: none;
+  }
+
+  .emoji-picker {
+    max-width: calc(100vw - 32px);
+  }
+
+  .emoji-picker-grid {
+    width: auto;
+  }
 }
