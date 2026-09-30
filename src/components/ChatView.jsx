@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { getSupabaseClient } from '../lib/supabaseClient'
-import { getSendWebhookUrl, setSendWebhookUrl } from '../lib/n8nConfig'
+import { getSendWebhookUrl } from '../lib/n8nConfig'
 import { markSeen } from '../lib/readTracking'
 import EmojiPicker from './EmojiPicker'
 
@@ -53,8 +53,6 @@ export default function ChatView({ conversation, onClose }) {
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [toggling, setToggling] = useState(false)
-  const [showWebhookConfig, setShowWebhookConfig] = useState(false)
-  const [webhookInput, setWebhookInput] = useState(getSendWebhookUrl())
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const bottomRef = useRef(null)
   const textareaRef = useRef(null)
@@ -218,11 +216,6 @@ export default function ChatView({ conversation, onClose }) {
     setToggling(false)
   }
 
-  function saveWebhook() {
-    setSendWebhookUrl(webhookInput.trim())
-    setShowWebhookConfig(false)
-  }
-
   if (!conversation || !liveConversation) {
     return (
       <div className="chat-view chat-view-empty">
@@ -256,31 +249,10 @@ export default function ChatView({ conversation, onClose }) {
         >
           {isHumano ? 'Modo: Humano' : 'Modo: Bot'}
         </button>
-        <button
-          type="button"
-          className="link-button small"
-          onClick={() => setShowWebhookConfig((v) => !v)}
-        >
-          ⚙
-        </button>
         <button type="button" className="link-button small" onClick={() => onClose?.()}>
           ✕
         </button>
       </div>
-
-      {showWebhookConfig && (
-        <div className="webhook-config">
-          <input
-            type="text"
-            placeholder="URL del webhook n8n para enviar a WhatsApp (opcional)"
-            value={webhookInput}
-            onChange={(e) => setWebhookInput(e.target.value)}
-          />
-          <button type="button" onClick={saveWebhook}>
-            Guardar
-          </button>
-        </div>
-      )}
 
       <div className="messages-container">
         {dayGroups.map((group) => (
@@ -335,12 +307,6 @@ export default function ChatView({ conversation, onClose }) {
           Enviar
         </button>
       </form>
-      {isHumano && !getSendWebhookUrl() && (
-        <p className="webhook-warning">
-          Sin webhook de envío configurado: el mensaje se guarda en Supabase pero no se
-          reenvía a WhatsApp automáticamente. Configúralo con el ícono ⚙.
-        </p>
-      )}
     </div>
   )
 }

@@ -111,6 +111,12 @@ export default function ConversationList({ selectedId, onSelect }) {
     setShowMenu(false)
   }
 
+  async function handleLogout() {
+    setShowMenu(false)
+    const supabase = getSupabaseClient()
+    await supabase.auth.signOut()
+  }
+
   const filtered = conversations.filter((c) => {
     const q = search.trim().toLowerCase()
     if (!q) return true
@@ -137,6 +143,9 @@ export default function ConversationList({ selectedId, onSelect }) {
             <div className="header-menu-dropdown">
               <button type="button" onClick={handleMarkAllRead}>
                 Marcar todas como leídas
+              </button>
+              <button type="button" onClick={handleLogout}>
+                Cerrar sesión
               </button>
             </div>
           )}
