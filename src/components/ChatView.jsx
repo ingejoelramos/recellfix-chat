@@ -46,7 +46,8 @@ function bubbleInfo(remitente) {
   return { side: 'outgoing outgoing-bot', label: 'Alex 🤖' }
 }
 
-export default function ChatView({ conversation }) {
+export default function ChatView({ conversation, onClose }) {
+  const [liveConversation, setLiveConversation] = useState(conversation)
   const [messages, setMessages] = useState([])
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
@@ -55,6 +56,10 @@ export default function ChatView({ conversation }) {
   const [webhookInput, setWebhookInput] = useState(getSendWebhookUrl())
   const bottomRef = useRef(null)
   const textareaRef = useRef(null)
+
+  useEffect(() => {
+    setLiveConversation(conversation)
+  }, [conversation])
 
   useEffect(() => {
     if (!conversation) return
@@ -73,7 +78,7 @@ export default function ChatView({ conversation }) {
     markSeen(conversation.id)
 
     const channel = supabase
-      .channel(`mensajes-${conversation.id}`)
+      .channel(`conversacion-${conversation.id}`)
       .on(
         'postgres_changes',
         {
@@ -88,6 +93,18 @@ export default function ChatView({ conversation }) {
             return [...prev, payload.new]
           })
           markSeen(conversation.id)
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversaciones',
+          filter: `id=eq.${conversation.id}`,
+        },
+        (payload) => {
+          setLiveConversation(payload.new)
         }
       )
       .subscribe()
@@ -109,9 +126,21 @@ export default function ChatView({ conversation }) {
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`
   }, [draft])
 
+  useEffect(() => {
+    if (!conversation) return
+    function handleGlobalKeyDown(e) {
+      if (e.key === 'Escape') {
+        onClose?.()
+      }
+    }
+    window.addEventListener('keydown', handleGlobalKeyDown)
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown)
+  }, [conversation, onClose])
+
   async function handleSend(e) {
     e.preventDefault()
-    if (!draft.trim() || !conversation) return
+    const isHumano = liveConversation?.modo === 'humano'
+    if (!draft.trim() || !conversation || !isHumano) return
     setSending(true)
     const supabase = getSupabaseClient()
     const contenido = draft.trim()
@@ -159,11 +188,14 @@ export default function ChatView({ conversation }) {
     if (!conversation) return
     setToggling(true)
     const supabase = getSupabaseClient()
-    const nuevoModo = conversation.modo === 'humano' ? 'bot' : 'humano'
-    await supabase
+    const nuevoModo = liveConversation?.modo === 'humano' ? 'bot' : 'humano'
+    const { data } = await supabase
       .from('conversaciones')
       .update({ modo: nuevoModo })
       .eq('id', conversation.id)
+      .select()
+      .single()
+    if (data) setLiveConversation(data)
     setToggling(false)
   }
 
@@ -172,7 +204,7 @@ export default function ChatView({ conversation }) {
     setShowWebhookConfig(false)
   }
 
-  if (!conversation) {
+  if (!conversation || !liveConversation) {
     return (
       <div className="chat-view chat-view-empty">
         <p>Selecciona una conversación para ver los mensajes.</p>
@@ -181,28 +213,29 @@ export default function ChatView({ conversation }) {
   }
 
   const dayGroups = groupByDay(messages)
+  const isHumano = liveConversation.modo === 'humano'
 
   return (
     <div className="chat-view">
       <div className="chat-header">
         <div className="avatar">
-          {(conversation.nombre_cliente || conversation.numero_whatsapp || '?')
+          {(liveConversation.nombre_cliente || liveConversation.numero_whatsapp || '?')
             .charAt(0)
             .toUpperCase()}
         </div>
         <div className="chat-header-info">
           <span className="chat-header-name">
-            {conversation.nombre_cliente || conversation.numero_whatsapp}
+            {liveConversation.nombre_cliente || liveConversation.numero_whatsapp}
           </span>
-          <span className="chat-header-number">{conversation.numero_whatsapp}</span>
+          <span className="chat-header-number">{liveConversation.numero_whatsapp}</span>
         </div>
         <button
           type="button"
-          className={`mode-toggle ${conversation.modo === 'humano' ? 'human' : 'bot'}`}
+          className={`mode-toggle ${isHumano ? 'human' : 'bot'}`}
           onClick={handleToggleMode}
           disabled={toggling}
         >
-          {conversation.modo === 'humano' ? 'Modo: Humano' : 'Modo: Bot'}
+          {isHumano ? 'Modo: Humano' : 'Modo: Bot'}
         </button>
         <button
           type="button"
@@ -210,6 +243,9 @@ export default function ChatView({ conversation }) {
           onClick={() => setShowWebhookConfig((v) => !v)}
         >
           ⚙
+        </button>
+        <button type="button" className="link-button small" onClick={() => onClose?.()}>
+          ✕
         </button>
       </div>
 
@@ -229,7 +265,7 @@ export default function ChatView({ conversation }) {
 
       <div className="messages-container">
         {dayGroups.map((group) => (
-          <div key={group.day}>
+          <div key={group.day} className="day-group">
             <div className="date-separator">
               <span>{group.label}</span>
             </div>
@@ -252,16 +288,17 @@ export default function ChatView({ conversation }) {
         <textarea
           ref={textareaRef}
           rows={1}
-          placeholder="Escribe un mensaje"
+          placeholder={isHumano ? 'Escribe un mensaje' : 'Activa modo Humano para escribir'}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={handleKeyDown}
+          disabled={!isHumano}
         />
-        <button type="submit" disabled={sending || !draft.trim()}>
+        <button type="submit" disabled={sending || !draft.trim() || !isHumano}>
           Enviar
         </button>
       </form>
-      {!getSendWebhookUrl() && (
+      {isHumano && !getSendWebhookUrl() && (
         <p className="webhook-warning">
           Sin webhook de envío configurado: el mensaje se guarda en Supabase pero no se
           reenvía a WhatsApp automáticamente. Configúralo con el ícono ⚙.

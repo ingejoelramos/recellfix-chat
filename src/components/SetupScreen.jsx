@@ -23,7 +23,7 @@ export default function SetupScreen({ onReady }) {
   return (
     <div className="setup-screen">
       <div className="setup-card">
-        <h1>RecellFix Chat</h1>
+        <h1>RecellFix Agent</h1>
         <p className="setup-subtitle">
           Conecta este panel con tu proyecto de Supabase existente.
         </p>

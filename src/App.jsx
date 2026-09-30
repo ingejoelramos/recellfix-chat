@@ -57,7 +57,10 @@ function App() {
         selectedId={selectedConversation?.id}
         onSelect={setSelectedConversation}
       />
-      <ChatView conversation={selectedConversation} />
+      <ChatView
+        conversation={selectedConversation}
+        onClose={() => setSelectedConversation(null)}
+      />
     </div>
   )
 }

@@ -10,11 +10,15 @@ function formatTime(iso) {
   if (sameDay) {
     return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
   }
-  return d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' })
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const yyyy = d.getFullYear()
+  return `${dd}/${mm}/${yyyy}`
 }
 
 export default function ConversationList({ selectedId, onSelect }) {
   const [conversations, setConversations] = useState([])
+  const [lastMessages, setLastMessages] = useState({})
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
 
@@ -31,6 +35,19 @@ export default function ConversationList({ selectedId, onSelect }) {
         setConversations(data || [])
       }
       setLoading(false)
+
+      const { data: recentMessages } = await supabase
+        .from('mensajes')
+        .select('conversacion_id, contenido, remitente, creado_en')
+        .order('creado_en', { ascending: false })
+        .limit(300)
+      if (active && recentMessages) {
+        const map = {}
+        for (const m of recentMessages) {
+          if (!map[m.conversacion_id]) map[m.conversacion_id] = m
+        }
+        setLastMessages(map)
+      }
     }
     load()
 
@@ -55,6 +72,13 @@ export default function ConversationList({ selectedId, onSelect }) {
           })
         }
       )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'mensajes' },
+        (payload) => {
+          setLastMessages((prev) => ({ ...prev, [payload.new.conversacion_id]: payload.new }))
+        }
+      )
       .subscribe()
 
     return () => {
@@ -75,7 +99,7 @@ export default function ConversationList({ selectedId, onSelect }) {
   return (
     <div className="conversation-list">
       <div className="conversation-list-header">
-        <h2>RecellFix Chat</h2>
+        <h2>RecellFix Agent</h2>
       </div>
       <div className="conversation-search">
         <input
@@ -92,6 +116,10 @@ export default function ConversationList({ selectedId, onSelect }) {
         )}
         {filtered.map((c) => {
           const unread = selectedId !== c.id && isUnread(c)
+          const last = lastMessages[c.id]
+          const preview = last
+            ? `${last.remitente === 'cliente' ? '' : '↳ '}${last.contenido}`
+            : 'Sin mensajes'
           return (
             <button
               key={c.id}
@@ -109,7 +137,7 @@ export default function ConversationList({ selectedId, onSelect }) {
                   <span className="conversation-time">{formatTime(c.actualizado_en)}</span>
                 </div>
                 <div className="conversation-row">
-                  <span className="conversation-number">{c.numero_whatsapp}</span>
+                  <span className="conversation-preview">{preview}</span>
                   <span className={`mode-badge ${c.modo === 'humano' ? 'human' : 'bot'}`}>
                     {c.modo === 'humano' ? 'Humano' : 'Bot'}
                   </span>

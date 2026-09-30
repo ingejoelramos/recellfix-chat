@@ -277,6 +277,16 @@ input {
   font-size: 12px;
 }
 
+.conversation-preview {
+  color: var(--wa-text-muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
 .mode-badge {
   font-size: 11px;
   padding: 2px 8px;
@@ -395,6 +405,11 @@ input {
   gap: 4px;
 }
 
+.day-group {
+  display: flex;
+  flex-direction: column;
+}
+
 .date-separator {
   display: flex;
   justify-content: center;
@@ -486,6 +501,11 @@ input {
 
 .message-input-bar textarea:focus {
   outline: none;
+}
+
+.message-input-bar textarea:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .message-input-bar button {
