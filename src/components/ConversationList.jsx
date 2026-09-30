@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getSupabaseClient } from '../lib/supabaseClient'
-import { isUnread } from '../lib/readTracking'
+import { isUnread, markSeen } from '../lib/readTracking'
+import { playNotificationSound } from '../lib/notificationSound'
 
 function formatTime(iso) {
   if (!iso) return ''
@@ -21,6 +22,9 @@ export default function ConversationList({ selectedId, onSelect }) {
   const [lastMessages, setLastMessages] = useState({})
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [showMenu, setShowMenu] = useState(false)
+  const [unreadTick, setUnreadTick] = useState(0)
+  const menuRef = useRef(null)
 
   useEffect(() => {
     const supabase = getSupabaseClient()
@@ -77,6 +81,9 @@ export default function ConversationList({ selectedId, onSelect }) {
         { event: 'INSERT', schema: 'public', table: 'mensajes' },
         (payload) => {
           setLastMessages((prev) => ({ ...prev, [payload.new.conversacion_id]: payload.new }))
+          if (payload.new.remitente === 'cliente') {
+            playNotificationSound()
+          }
         }
       )
       .subscribe()
@@ -86,6 +93,23 @@ export default function ConversationList({ selectedId, onSelect }) {
       supabase.removeChannel(channel)
     }
   }, [])
+
+  useEffect(() => {
+    if (!showMenu) return
+    function handleClickOutside(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setShowMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showMenu])
+
+  function handleMarkAllRead() {
+    conversations.forEach((c) => markSeen(c.id))
+    setUnreadTick((t) => t + 1)
+    setShowMenu(false)
+  }
 
   const filtered = conversations.filter((c) => {
     const q = search.trim().toLowerCase()
@@ -100,6 +124,23 @@ export default function ConversationList({ selectedId, onSelect }) {
     <div className="conversation-list">
       <div className="conversation-list-header">
         <h2>RecellFix Agent</h2>
+        <div className="header-menu" ref={menuRef}>
+          <button
+            type="button"
+            className="header-menu-toggle"
+            onClick={() => setShowMenu((v) => !v)}
+            aria-label="Más opciones"
+          >
+            ⋮
+          </button>
+          {showMenu && (
+            <div className="header-menu-dropdown">
+              <button type="button" onClick={handleMarkAllRead}>
+                Marcar todas como leídas
+              </button>
+            </div>
+          )}
+        </div>
       </div>
       <div className="conversation-search">
         <input
@@ -115,7 +156,7 @@ export default function ConversationList({ selectedId, onSelect }) {
           <p className="empty-hint">Sin conversaciones todavía.</p>
         )}
         {filtered.map((c) => {
-          const unread = selectedId !== c.id && isUnread(c)
+          const unread = unreadTick >= 0 && selectedId !== c.id && isUnread(c)
           const last = lastMessages[c.id]
           const preview = last
             ? `${last.remitente === 'cliente' ? '' : '↳ '}${last.contenido}`

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getEffectiveConfig, shouldForceSetup, getSupabaseClient } from './lib/supabaseClient'
+import { unlockAudio } from './lib/notificationSound'
 import SetupScreen from './components/SetupScreen'
 import LoginScreen from './components/LoginScreen'
 import ConversationList from './components/ConversationList'
@@ -11,6 +12,20 @@ function App() {
   const [session, setSession] = useState(null)
   const [checkingSession, setCheckingSession] = useState(true)
   const [selectedConversation, setSelectedConversation] = useState(null)
+
+  useEffect(() => {
+    function handleFirstInteraction() {
+      unlockAudio()
+      window.removeEventListener('click', handleFirstInteraction)
+      window.removeEventListener('keydown', handleFirstInteraction)
+    }
+    window.addEventListener('click', handleFirstInteraction)
+    window.addEventListener('keydown', handleFirstInteraction)
+    return () => {
+      window.removeEventListener('click', handleFirstInteraction)
+      window.removeEventListener('keydown', handleFirstInteraction)
+    }
+  }, [])
 
   useEffect(() => {
     if (!configReady) {

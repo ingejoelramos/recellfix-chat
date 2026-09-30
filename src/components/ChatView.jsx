@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { getSupabaseClient } from '../lib/supabaseClient'
 import { getSendWebhookUrl, setSendWebhookUrl } from '../lib/n8nConfig'
 import { markSeen } from '../lib/readTracking'
+import EmojiPicker from './EmojiPicker'
 
 function formatTime(iso) {
   if (!iso) return ''
@@ -54,6 +55,7 @@ export default function ChatView({ conversation, onClose }) {
   const [toggling, setToggling] = useState(false)
   const [showWebhookConfig, setShowWebhookConfig] = useState(false)
   const [webhookInput, setWebhookInput] = useState(getSendWebhookUrl())
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const bottomRef = useRef(null)
   const textareaRef = useRef(null)
 
@@ -177,6 +179,23 @@ export default function ChatView({ conversation, onClose }) {
     textareaRef.current?.focus()
   }
 
+  function handleInsertEmoji(emoji) {
+    const el = textareaRef.current
+    if (!el) {
+      setDraft((prev) => prev + emoji)
+      return
+    }
+    const start = el.selectionStart ?? draft.length
+    const end = el.selectionEnd ?? draft.length
+    const next = draft.slice(0, start) + emoji + draft.slice(end)
+    setDraft(next)
+    requestAnimationFrame(() => {
+      el.focus()
+      const cursor = start + emoji.length
+      el.setSelectionRange(cursor, cursor)
+    })
+  }
+
   function handleKeyDown(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -285,6 +304,23 @@ export default function ChatView({ conversation, onClose }) {
       </div>
 
       <form className="message-input-bar" onSubmit={handleSend}>
+        <div className="emoji-anchor">
+          {showEmojiPicker && (
+            <EmojiPicker
+              onSelect={handleInsertEmoji}
+              onClose={() => setShowEmojiPicker(false)}
+            />
+          )}
+          <button
+            type="button"
+            className="emoji-toggle"
+            disabled={!isHumano}
+            onClick={() => setShowEmojiPicker((v) => !v)}
+            aria-label="Insertar emoji"
+          >
+            😊
+          </button>
+        </div>
         <textarea
           ref={textareaRef}
           rows={1}
@@ -292,6 +328,7 @@ export default function ChatView({ conversation, onClose }) {
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={handleKeyDown}
+          onFocus={() => setShowEmojiPicker(false)}
           disabled={!isHumano}
         />
         <button type="submit" disabled={sending || !draft.trim() || !isHumano}>
