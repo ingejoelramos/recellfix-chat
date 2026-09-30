@@ -21,8 +21,8 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'Nuevo mensaje'
   const options = {
     body: data.body || '',
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
+    icon: '/favicon-192.png',
+    badge: '/favicon-192.png',
     tag: data.tag || 'recellfix-mensaje',
     data: { url: data.url || '/' },
     vibrate: [200, 100, 200],
