@@ -39,6 +39,25 @@ function ColorSwatchPicker({ value, onChange }) {
   )
 }
 
+const MEDIA_PREVIEW_LABELS = {
+  imagen: '📷 Foto',
+  audio: '🎤 Audio',
+  video: '🎥 Video',
+  documento: '📄 Documento',
+}
+
+function buildPreview(conversation) {
+  if (!conversation.ultimo_mensaje_contenido && !conversation.ultimo_mensaje_tipo) {
+    return 'Sin mensajes'
+  }
+  const prefix = conversation.ultimo_mensaje_remitente === 'cliente' ? '' : '↳ '
+  const tipo = conversation.ultimo_mensaje_tipo
+  if (tipo && tipo !== 'texto') {
+    return `${prefix}${MEDIA_PREVIEW_LABELS[tipo] || '📎 Archivo'}`
+  }
+  return `${prefix}${conversation.ultimo_mensaje_contenido}`
+}
+
 function formatTime(iso) {
   if (!iso) return ''
   const d = new Date(iso)
@@ -620,9 +639,7 @@ export default function ConversationList({ selectedId, onSelect }) {
         )}
         {filtered.map((c) => {
           const unread = unreadTick >= 0 && selectedId !== c.id && isUnread(c)
-          const preview = c.ultimo_mensaje_contenido
-            ? `${c.ultimo_mensaje_remitente === 'cliente' ? '' : '↳ '}${c.ultimo_mensaje_contenido}`
-            : 'Sin mensajes'
+          const preview = buildPreview(c)
           const memberOf = membership[c.id]
           const avatarColor = memberOf
             ? customLists.find((list) => memberOf.has(list.id))?.color

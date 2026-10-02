@@ -47,6 +47,32 @@ function bubbleInfo(remitente) {
   return { side: 'outgoing outgoing-bot', label: 'Alex 🤖' }
 }
 
+function MessageMedia({ tipo, url, caption }) {
+  if (tipo === 'imagen') {
+    return (
+      <a href={url} target="_blank" rel="noreferrer">
+        <img src={url} alt={caption || 'Imagen'} className="message-media-image" />
+      </a>
+    )
+  }
+  if (tipo === 'video') {
+    // eslint-disable-next-line jsx-a11y/media-has-caption
+    return <video src={url} controls className="message-media-video" />
+  }
+  if (tipo === 'audio') {
+    // eslint-disable-next-line jsx-a11y/media-has-caption
+    return <audio src={url} controls className="message-media-audio" />
+  }
+  if (tipo === 'documento') {
+    return (
+      <a href={url} target="_blank" rel="noreferrer" className="message-media-doc">
+        📄 {caption || 'Documento'}
+      </a>
+    )
+  }
+  return null
+}
+
 export default function ChatView({ conversation, onClose }) {
   const [liveConversation, setLiveConversation] = useState(conversation)
   const [messages, setMessages] = useState([])
@@ -270,10 +296,20 @@ export default function ChatView({ conversation, onClose }) {
             </div>
             {group.items.map((m) => {
               const { side, label } = bubbleInfo(m.remitente)
+              const isMedia = !!m.media_url && m.tipo !== 'texto'
               return (
-                <div key={m.id} className={`message-bubble ${side}`}>
+                <div key={m.id} className={`message-bubble ${side} ${isMedia ? 'has-media' : ''}`}>
                   {label && <div className="message-sender-label">{label}</div>}
-                  <div className="message-content">{m.contenido}</div>
+                  {isMedia ? (
+                    <>
+                      <MessageMedia tipo={m.tipo} url={m.media_url} caption={m.contenido} />
+                      {m.tipo !== 'documento' && m.contenido && (
+                        <div className="message-content">{m.contenido}</div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="message-content">{m.contenido}</div>
+                  )}
                   <div className="message-time">{formatTime(m.creado_en)}</div>
                 </div>
               )

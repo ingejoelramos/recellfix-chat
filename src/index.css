@@ -596,6 +596,46 @@ input {
   background: #3b3470;
 }
 
+.message-bubble.has-media {
+  padding: 4px;
+}
+
+.message-bubble.has-media .message-content {
+  padding: 4px 5px 2px;
+}
+
+.message-media-image {
+  display: block;
+  max-width: 260px;
+  max-height: 320px;
+  width: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.message-media-video {
+  display: block;
+  max-width: 280px;
+  width: 100%;
+  border-radius: 6px;
+}
+
+.message-media-audio {
+  display: block;
+  width: 240px;
+  max-width: 100%;
+}
+
+.message-media-doc {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--wa-text);
+  text-decoration: underline;
+  padding: 6px 4px;
+}
+
 .message-sender-label {
   font-size: 11px;
   font-weight: 700;
