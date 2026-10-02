@@ -23,6 +23,19 @@ export function isReservedListName(nombre) {
   return RESERVED_NAMES.includes(normalizeName(nombre))
 }
 
+export const LIST_COLOR_PALETTE = [
+  '#00a884', // verde
+  '#8e44ec', // morado
+  '#f15c6d', // rojo
+  '#2fa8e0', // azul
+  '#f5a623', // ámbar
+  '#2ec4b6', // turquesa
+  '#e84393', // rosa
+  '#8696a0', // gris
+]
+
+export const DEFAULT_LIST_COLOR = LIST_COLOR_PALETTE[0]
+
 export async function fetchLists(supabase) {
   const { data, error } = await supabase
     .from('listas_chat')
@@ -38,7 +51,7 @@ export async function fetchMemberships(supabase) {
   return data || []
 }
 
-export async function createList(supabase, nombreCrudo) {
+export async function createList(supabase, nombreCrudo, color = DEFAULT_LIST_COLOR) {
   const nombre = (nombreCrudo || '').trim()
   if (!nombre) {
     throw new Error('Escribe un nombre para la lista.')
@@ -46,7 +59,11 @@ export async function createList(supabase, nombreCrudo) {
   if (isReservedListName(nombre)) {
     throw new Error('Ese nombre ya lo usa una lista automática.')
   }
-  const { data, error } = await supabase.from('listas_chat').insert({ nombre }).select().single()
+  const { data, error } = await supabase
+    .from('listas_chat')
+    .insert({ nombre, color })
+    .select()
+    .single()
   if (error) {
     if (error.code === '23505') throw new Error('Ya existe una lista con ese nombre.')
     throw error
@@ -56,6 +73,11 @@ export async function createList(supabase, nombreCrudo) {
 
 export async function deleteList(supabase, listaId) {
   const { error } = await supabase.from('listas_chat').delete().eq('id', listaId)
+  if (error) throw error
+}
+
+export async function updateListColor(supabase, listaId, color) {
+  const { error } = await supabase.from('listas_chat').update({ color }).eq('id', listaId)
   if (error) throw error
 }
 

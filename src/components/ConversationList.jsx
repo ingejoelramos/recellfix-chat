@@ -11,13 +11,33 @@ import {
 } from '../lib/pushNotifications'
 import {
   FIXED_TABS,
+  LIST_COLOR_PALETTE,
+  DEFAULT_LIST_COLOR,
   fetchLists,
   fetchMemberships,
   createList,
   deleteList,
+  updateListColor,
   addConversationToList,
   removeConversationFromList,
 } from '../lib/chatLists'
+
+function ColorSwatchPicker({ value, onChange }) {
+  return (
+    <div className="color-swatch-picker">
+      {LIST_COLOR_PALETTE.map((color) => (
+        <button
+          key={color}
+          type="button"
+          className={`color-swatch ${value === color ? 'selected' : ''}`}
+          style={{ background: color }}
+          aria-label={`Color ${color}`}
+          onClick={() => onChange(color)}
+        />
+      ))}
+    </div>
+  )
+}
 
 function formatTime(iso) {
   if (!iso) return ''
@@ -39,6 +59,7 @@ function ConversationRow({
   unread,
   preview,
   time,
+  avatarColor,
   swipeOpen,
   onSwipeOpen,
   onSwipeClose,
@@ -51,6 +72,9 @@ function ConversationRow({
     trackMouse: true,
     preventScrollOnSwipe: false,
   })
+
+  const hasName = !!conversation.nombre_cliente?.trim()
+  const initial = hasName ? conversation.nombre_cliente.trim().charAt(0).toUpperCase() : '?'
 
   return (
     <div
@@ -73,8 +97,8 @@ function ConversationRow({
         className={`conversation-item ${selected ? 'active' : ''} ${swipeOpen ? 'swiped' : ''}`}
         onClick={() => (swipeOpen ? onSwipeClose() : onSelect(conversation))}
       >
-        <div className="avatar">
-          {(conversation.nombre_cliente || conversation.numero_whatsapp || '?').charAt(0).toUpperCase()}
+        <div className="avatar" style={avatarColor ? { background: avatarColor } : undefined}>
+          {initial}
         </div>
         <div className="conversation-info">
           <div className="conversation-row">
@@ -98,6 +122,7 @@ function ConversationRow({
 
 function AddToListModal({ conversation, lists, membership, onToggle, onClose, onCreateList }) {
   const [newListName, setNewListName] = useState('')
+  const [newListColor, setNewListColor] = useState(DEFAULT_LIST_COLOR)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -108,8 +133,9 @@ function AddToListModal({ conversation, lists, membership, onToggle, onClose, on
     setError('')
     setBusy(true)
     try {
-      await onCreateList(newListName)
+      await onCreateList(newListName, newListColor)
       setNewListName('')
+      setNewListColor(DEFAULT_LIST_COLOR)
     } catch (err) {
       setError(err.message || 'No se pudo crear la lista.')
     } finally {
@@ -138,6 +164,7 @@ function AddToListModal({ conversation, lists, membership, onToggle, onClose, on
                   checked={current.has(list.id)}
                   onChange={(e) => onToggle(conversation.id, list.id, e.target.checked)}
                 />
+                <span className="list-color-dot" style={{ background: list.color || DEFAULT_LIST_COLOR }} />
                 {list.nombre}
               </label>
             </div>
@@ -153,6 +180,7 @@ function AddToListModal({ conversation, lists, membership, onToggle, onClose, on
               Crear
             </button>
           </form>
+          <ColorSwatchPicker value={newListColor} onChange={setNewListColor} />
           {error && <p className="modal-error">{error}</p>}
         </div>
       </div>
@@ -160,18 +188,21 @@ function AddToListModal({ conversation, lists, membership, onToggle, onClose, on
   )
 }
 
-function ManageListsModal({ lists, onClose, onCreateList, onDeleteList }) {
+function ManageListsModal({ lists, onClose, onCreateList, onDeleteList, onUpdateColor }) {
   const [newListName, setNewListName] = useState('')
+  const [newListColor, setNewListColor] = useState(DEFAULT_LIST_COLOR)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [editingColorId, setEditingColorId] = useState(null)
 
   async function handleCreate(e) {
     e.preventDefault()
     setError('')
     setBusy(true)
     try {
-      await onCreateList(newListName)
+      await onCreateList(newListName, newListColor)
       setNewListName('')
+      setNewListColor(DEFAULT_LIST_COLOR)
     } catch (err) {
       setError(err.message || 'No se pudo crear la lista.')
     } finally {
@@ -188,6 +219,15 @@ function ManageListsModal({ lists, onClose, onCreateList, onDeleteList }) {
     }
   }
 
+  async function handlePickColor(list, color) {
+    setEditingColorId(null)
+    try {
+      await onUpdateColor(list.id, color)
+    } catch (err) {
+      setError(err.message || 'No se pudo cambiar el color.')
+    }
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
@@ -200,16 +240,28 @@ function ManageListsModal({ lists, onClose, onCreateList, onDeleteList }) {
         <div className="modal-body">
           {lists.length === 0 && <p className="modal-empty-hint">Todavía no hay listas creadas.</p>}
           {lists.map((list) => (
-            <div className="modal-list-item" key={list.id}>
-              <span>{list.nombre}</span>
-              <button
-                type="button"
-                className="modal-delete-btn"
-                onClick={() => handleDelete(list)}
-                aria-label={`Eliminar lista ${list.nombre}`}
-              >
-                🗑
-              </button>
+            <div className="modal-list-item-group" key={list.id}>
+              <div className="modal-list-item">
+                <button
+                  type="button"
+                  className="list-color-dot list-color-dot-button"
+                  style={{ background: list.color || DEFAULT_LIST_COLOR }}
+                  aria-label={`Cambiar color de ${list.nombre}`}
+                  onClick={() => setEditingColorId(editingColorId === list.id ? null : list.id)}
+                />
+                <span style={{ flex: 1 }}>{list.nombre}</span>
+                <button
+                  type="button"
+                  className="modal-delete-btn"
+                  onClick={() => handleDelete(list)}
+                  aria-label={`Eliminar lista ${list.nombre}`}
+                >
+                  🗑
+                </button>
+              </div>
+              {editingColorId === list.id && (
+                <ColorSwatchPicker value={list.color} onChange={(color) => handlePickColor(list, color)} />
+              )}
             </div>
           ))}
           <form className="modal-new-list-row" onSubmit={handleCreate}>
@@ -223,6 +275,7 @@ function ManageListsModal({ lists, onClose, onCreateList, onDeleteList }) {
               Crear
             </button>
           </form>
+          <ColorSwatchPicker value={newListColor} onChange={setNewListColor} />
           {error && <p className="modal-error">{error}</p>}
         </div>
       </div>
@@ -417,9 +470,9 @@ export default function ConversationList({ selectedId, onSelect }) {
     }
   }
 
-  async function handleCreateList(nombre) {
+  async function handleCreateList(nombre, color) {
     const supabase = getSupabaseClient()
-    const created = await createList(supabase, nombre)
+    const created = await createList(supabase, nombre, color)
     setCustomLists((prev) =>
       prev.some((l) => l.id === created.id)
         ? prev
@@ -432,6 +485,12 @@ export default function ConversationList({ selectedId, onSelect }) {
     await deleteList(supabase, listaId)
     setCustomLists((prev) => prev.filter((l) => l.id !== listaId))
     setActiveTab((current) => (current === listaId ? 'todos' : current))
+  }
+
+  async function handleUpdateListColor(listaId, color) {
+    const supabase = getSupabaseClient()
+    setCustomLists((prev) => prev.map((l) => (l.id === listaId ? { ...l, color } : l)))
+    await updateListColor(supabase, listaId, color)
   }
 
   async function handleToggleMembership(conversacionId, listaId, checked) {
@@ -564,6 +623,10 @@ export default function ConversationList({ selectedId, onSelect }) {
           const preview = c.ultimo_mensaje_contenido
             ? `${c.ultimo_mensaje_remitente === 'cliente' ? '' : '↳ '}${c.ultimo_mensaje_contenido}`
             : 'Sin mensajes'
+          const memberOf = membership[c.id]
+          const avatarColor = memberOf
+            ? customLists.find((list) => memberOf.has(list.id))?.color
+            : undefined
           return (
             <ConversationRow
               key={c.id}
@@ -572,6 +635,7 @@ export default function ConversationList({ selectedId, onSelect }) {
               unread={unread}
               preview={preview}
               time={formatTime(c.actualizado_en)}
+              avatarColor={avatarColor}
               swipeOpen={openSwipeId === c.id}
               onSwipeOpen={setOpenSwipeId}
               onSwipeClose={() => setOpenSwipeId(null)}
@@ -602,6 +666,7 @@ export default function ConversationList({ selectedId, onSelect }) {
           onClose={() => setManageListsOpen(false)}
           onCreateList={handleCreateList}
           onDeleteList={handleDeleteList}
+          onUpdateColor={handleUpdateListColor}
         />
       )}
     </div>

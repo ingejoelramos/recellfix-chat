@@ -779,6 +779,12 @@ input {
   gap: 8px;
 }
 
+.modal-list-item-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .modal-list-item {
   display: flex;
   align-items: center;
@@ -796,6 +802,39 @@ input {
   font-size: 13px;
   flex: 1;
   cursor: pointer;
+}
+
+.list-color-dot {
+  width: 12px;
+  height: 12px;
+  min-width: 12px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.list-color-dot-button {
+  border: 2px solid var(--wa-border);
+  padding: 0;
+  cursor: pointer;
+}
+
+.color-swatch-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 2px 2px;
+}
+
+.color-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+}
+
+.color-swatch.selected {
+  border-color: var(--wa-text);
 }
 
 .modal-list-item input[type='checkbox'] {
