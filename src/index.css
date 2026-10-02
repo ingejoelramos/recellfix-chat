@@ -10,6 +10,7 @@
   --wa-text-muted: #8696a0;
   --wa-border: #2a3942;
   --wa-hover: #202c33;
+  --avatar-default: #56707c;
   --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
   font: 14px/1.4 var(--sans);
@@ -372,7 +373,7 @@ input {
   height: 42px;
   min-width: 42px;
   border-radius: 50%;
-  background: var(--wa-green);
+  background: var(--avatar-default);
   color: #fff;
   display: flex;
   align-items: center;
