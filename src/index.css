@@ -249,10 +249,83 @@ input {
   font-size: 13px;
 }
 
+/* --- Pestañas de listas (estilo WhatsApp) --- */
+
+.list-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 2px 12px 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.list-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.list-tab {
+  flex: 0 0 auto;
+  background: var(--wa-dark);
+  border: none;
+  color: var(--wa-text-muted);
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 16px;
+  white-space: nowrap;
+}
+
+.list-tab.active {
+  background: var(--wa-green);
+  color: #07211b;
+  font-weight: 600;
+}
+
+.list-tab-add {
+  width: 32px;
+  padding: 6px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--wa-border);
+  background: none;
+  font-size: 16px;
+  line-height: 1;
+}
+
 .conversation-items {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+}
+
+/* --- Swipe-to-reveal por chat --- */
+
+.conversation-row-wrapper {
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid var(--wa-border);
+  touch-action: pan-y;
+}
+
+.conversation-swipe-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #3b3470;
+}
+
+.swipe-action-button {
+  width: 100%;
+  height: 100%;
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 20px;
 }
 
 .conversation-item {
@@ -260,13 +333,18 @@ input {
   align-items: center;
   gap: 12px;
   width: 100%;
-  background: none;
+  background: var(--wa-panel);
   border: none;
-  border-bottom: 1px solid var(--wa-border);
   padding: 12px 16px;
   text-align: left;
   color: var(--wa-text);
   position: relative;
+  z-index: 1;
+  transition: transform 0.2s ease;
+}
+
+.conversation-item.swiped {
+  transform: translateX(-64px);
 }
 
 .conversation-name.unread {
@@ -644,6 +722,137 @@ input {
   text-align: center;
   padding: 4px 16px 8px;
   margin: 0;
+}
+
+/* --- Modales (añadir a lista / gestionar listas) --- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 16px;
+}
+
+.modal-card {
+  background: var(--wa-dark);
+  border: 1px solid var(--wa-border);
+  border-radius: 12px;
+  width: 360px;
+  max-width: 100%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--wa-border);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--wa-text-muted);
+  font-size: 18px;
+  padding: 2px 6px;
+}
+
+.modal-body {
+  padding: 12px 16px 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modal-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--wa-panel);
+  border-radius: 8px;
+}
+
+.modal-list-item label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  flex: 1;
+  cursor: pointer;
+}
+
+.modal-list-item input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--wa-green);
+}
+
+.modal-delete-btn {
+  background: none;
+  border: none;
+  color: #f15c6d;
+  font-size: 16px;
+  padding: 4px 6px;
+}
+
+.modal-new-list-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.modal-new-list-row input {
+  flex: 1;
+  background: var(--wa-panel);
+  border: 1px solid var(--wa-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--wa-text);
+  font-size: 13px;
+}
+
+.modal-new-list-row button {
+  background: var(--wa-green);
+  color: #07211b;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.modal-new-list-row button:disabled {
+  opacity: 0.6;
+}
+
+.modal-error {
+  color: #f15c6d;
+  font-size: 12px;
+  margin: 2px 0 0;
+}
+
+.modal-empty-hint {
+  color: var(--wa-text-muted);
+  font-size: 13px;
+  text-align: center;
+  padding: 8px 0;
 }
 
 /* --- Responsive: pantallas angostas (celular) --- */

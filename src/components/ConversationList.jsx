@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSwipeable } from 'react-swipeable'
 import { getSupabaseClient } from '../lib/supabaseClient'
 import { isUnread, markSeen } from '../lib/readTracking'
 import { playNotificationSound } from '../lib/notificationSound'
@@ -8,6 +9,15 @@ import {
   enablePush,
   disablePush,
 } from '../lib/pushNotifications'
+import {
+  FIXED_TABS,
+  fetchLists,
+  fetchMemberships,
+  createList,
+  deleteList,
+  addConversationToList,
+  removeConversationFromList,
+} from '../lib/chatLists'
 
 function formatTime(iso) {
   if (!iso) return ''
@@ -23,6 +33,203 @@ function formatTime(iso) {
   return `${dd}/${mm}/${yyyy}`
 }
 
+function ConversationRow({
+  conversation,
+  selected,
+  unread,
+  preview,
+  time,
+  swipeOpen,
+  onSwipeOpen,
+  onSwipeClose,
+  onSelect,
+  onOpenAddToList,
+}) {
+  const handlers = useSwipeable({
+    onSwipedLeft: () => onSwipeOpen(conversation.id),
+    onSwipedRight: () => onSwipeClose(),
+    trackMouse: true,
+    preventScrollOnSwipe: false,
+  })
+
+  return (
+    <div
+      className="conversation-row-wrapper"
+      data-swipe-id={conversation.id}
+      {...handlers}
+    >
+      <div className="conversation-swipe-actions">
+        <button
+          type="button"
+          className="swipe-action-button"
+          aria-label="Más opciones del chat"
+          onClick={() => onOpenAddToList(conversation)}
+        >
+          ☰
+        </button>
+      </div>
+      <button
+        type="button"
+        className={`conversation-item ${selected ? 'active' : ''} ${swipeOpen ? 'swiped' : ''}`}
+        onClick={() => (swipeOpen ? onSwipeClose() : onSelect(conversation))}
+      >
+        <div className="avatar">
+          {(conversation.nombre_cliente || conversation.numero_whatsapp || '?').charAt(0).toUpperCase()}
+        </div>
+        <div className="conversation-info">
+          <div className="conversation-row">
+            <span className={`conversation-name ${unread ? 'unread' : ''}`}>
+              {conversation.nombre_cliente || conversation.numero_whatsapp}
+            </span>
+            <span className="conversation-time">{time}</span>
+          </div>
+          <div className="conversation-row">
+            <span className="conversation-preview">{preview}</span>
+            <span className={`mode-badge ${conversation.modo === 'humano' ? 'human' : 'bot'}`}>
+              {conversation.modo === 'humano' ? 'Humano' : 'Bot'}
+            </span>
+          </div>
+        </div>
+        {unread && <span className="unread-dot" />}
+      </button>
+    </div>
+  )
+}
+
+function AddToListModal({ conversation, lists, membership, onToggle, onClose, onCreateList }) {
+  const [newListName, setNewListName] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const current = membership[conversation.id] || new Set()
+
+  async function handleCreate(e) {
+    e.preventDefault()
+    setError('')
+    setBusy(true)
+    try {
+      await onCreateList(newListName)
+      setNewListName('')
+    } catch (err) {
+      setError(err.message || 'No se pudo crear la lista.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>Añadir a lista</h3>
+          <button type="button" className="modal-close" onClick={onClose} aria-label="Cerrar">
+            ✕
+          </button>
+        </div>
+        <div className="modal-body">
+          {lists.length === 0 && (
+            <p className="modal-empty-hint">Todavía no hay listas. Crea una abajo.</p>
+          )}
+          {lists.map((list) => (
+            <div className="modal-list-item" key={list.id}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={current.has(list.id)}
+                  onChange={(e) => onToggle(conversation.id, list.id, e.target.checked)}
+                />
+                {list.nombre}
+              </label>
+            </div>
+          ))}
+          <form className="modal-new-list-row" onSubmit={handleCreate}>
+            <input
+              type="text"
+              placeholder="Nueva lista…"
+              value={newListName}
+              onChange={(e) => setNewListName(e.target.value)}
+            />
+            <button type="submit" disabled={busy}>
+              Crear
+            </button>
+          </form>
+          {error && <p className="modal-error">{error}</p>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ManageListsModal({ lists, onClose, onCreateList, onDeleteList }) {
+  const [newListName, setNewListName] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function handleCreate(e) {
+    e.preventDefault()
+    setError('')
+    setBusy(true)
+    try {
+      await onCreateList(newListName)
+      setNewListName('')
+    } catch (err) {
+      setError(err.message || 'No se pudo crear la lista.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleDelete(list) {
+    if (!window.confirm(`¿Eliminar la lista "${list.nombre}"? Se quitará de todos los chats.`)) return
+    try {
+      await onDeleteList(list.id)
+    } catch (err) {
+      setError(err.message || 'No se pudo eliminar la lista.')
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>Gestionar listas</h3>
+          <button type="button" className="modal-close" onClick={onClose} aria-label="Cerrar">
+            ✕
+          </button>
+        </div>
+        <div className="modal-body">
+          {lists.length === 0 && <p className="modal-empty-hint">Todavía no hay listas creadas.</p>}
+          {lists.map((list) => (
+            <div className="modal-list-item" key={list.id}>
+              <span>{list.nombre}</span>
+              <button
+                type="button"
+                className="modal-delete-btn"
+                onClick={() => handleDelete(list)}
+                aria-label={`Eliminar lista ${list.nombre}`}
+              >
+                🗑
+              </button>
+            </div>
+          ))}
+          <form className="modal-new-list-row" onSubmit={handleCreate}>
+            <input
+              type="text"
+              placeholder="Nueva lista…"
+              value={newListName}
+              onChange={(e) => setNewListName(e.target.value)}
+            />
+            <button type="submit" disabled={busy}>
+              Crear
+            </button>
+          </form>
+          {error && <p className="modal-error">{error}</p>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function ConversationList({ selectedId, onSelect }) {
   const [conversations, setConversations] = useState([])
   const [lastMessages, setLastMessages] = useState({})
@@ -33,6 +240,13 @@ export default function ConversationList({ selectedId, onSelect }) {
   const [pushEnabled, setPushEnabled] = useState(false)
   const [pushBusy, setPushBusy] = useState(false)
   const menuRef = useRef(null)
+
+  const [activeTab, setActiveTab] = useState('todos')
+  const [customLists, setCustomLists] = useState([])
+  const [membership, setMembership] = useState({})
+  const [openSwipeId, setOpenSwipeId] = useState(null)
+  const [addToListTarget, setAddToListTarget] = useState(null)
+  const [manageListsOpen, setManageListsOpen] = useState(false)
 
   useEffect(() => {
     if (!isPushSupported()) return
@@ -64,6 +278,20 @@ export default function ConversationList({ selectedId, onSelect }) {
           if (!map[m.conversacion_id]) map[m.conversacion_id] = m
         }
         setLastMessages(map)
+      }
+
+      try {
+        const [lists, memberships] = await Promise.all([fetchLists(supabase), fetchMemberships(supabase)])
+        if (!active) return
+        setCustomLists(lists)
+        const map = {}
+        for (const row of memberships) {
+          if (!map[row.conversacion_id]) map[row.conversacion_id] = new Set()
+          map[row.conversacion_id].add(row.lista_id)
+        }
+        setMembership(map)
+      } catch (err) {
+        console.error('No se pudieron cargar las listas:', err)
       }
     }
     load()
@@ -101,9 +329,53 @@ export default function ConversationList({ selectedId, onSelect }) {
       )
       .subscribe()
 
+    const listsChannel = supabase
+      .channel('listas-chat-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'listas_chat' },
+        (payload) => {
+          setCustomLists((prev) => {
+            if (payload.eventType === 'DELETE') {
+              return prev.filter((l) => l.id !== payload.old.id)
+            }
+            const row = payload.new
+            const exists = prev.some((l) => l.id === row.id)
+            const next = exists ? prev.map((l) => (l.id === row.id ? row : l)) : [...prev, row]
+            return next.sort((a, b) => new Date(a.creado_en) - new Date(b.creado_en))
+          })
+          if (payload.eventType === 'DELETE') {
+            setActiveTab((current) => (current === payload.old.id ? 'todos' : current))
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'conversacion_listas' },
+        (payload) => {
+          setMembership((prev) => {
+            const next = { ...prev }
+            if (payload.eventType === 'DELETE') {
+              const row = payload.old
+              const set = new Set(next[row.conversacion_id] || [])
+              set.delete(row.lista_id)
+              next[row.conversacion_id] = set
+              return next
+            }
+            const row = payload.new
+            const set = new Set(next[row.conversacion_id] || [])
+            set.add(row.lista_id)
+            next[row.conversacion_id] = set
+            return next
+          })
+        }
+      )
+      .subscribe()
+
     return () => {
       active = false
       supabase.removeChannel(channel)
+      supabase.removeChannel(listsChannel)
     }
   }, [])
 
@@ -117,6 +389,17 @@ export default function ConversationList({ selectedId, onSelect }) {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showMenu])
+
+  useEffect(() => {
+    if (!openSwipeId) return
+    function handleClickOutside(e) {
+      if (!e.target.closest(`[data-swipe-id="${openSwipeId}"]`)) {
+        setOpenSwipeId(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [openSwipeId])
 
   function handleMarkAllRead() {
     conversations.forEach((c) => markSeen(c.id))
@@ -149,14 +432,60 @@ export default function ConversationList({ selectedId, onSelect }) {
     }
   }
 
-  const filtered = conversations.filter((c) => {
-    const q = search.trim().toLowerCase()
-    if (!q) return true
-    return (
-      (c.nombre_cliente || '').toLowerCase().includes(q) ||
-      (c.numero_whatsapp || '').toLowerCase().includes(q)
+  async function handleCreateList(nombre) {
+    const supabase = getSupabaseClient()
+    const created = await createList(supabase, nombre)
+    setCustomLists((prev) =>
+      prev.some((l) => l.id === created.id)
+        ? prev
+        : [...prev, created].sort((a, b) => new Date(a.creado_en) - new Date(b.creado_en))
     )
-  })
+  }
+
+  async function handleDeleteList(listaId) {
+    const supabase = getSupabaseClient()
+    await deleteList(supabase, listaId)
+    setCustomLists((prev) => prev.filter((l) => l.id !== listaId))
+    setActiveTab((current) => (current === listaId ? 'todos' : current))
+  }
+
+  async function handleToggleMembership(conversacionId, listaId, checked) {
+    const supabase = getSupabaseClient()
+    setMembership((prev) => {
+      const next = { ...prev }
+      const set = new Set(next[conversacionId] || [])
+      if (checked) set.add(listaId)
+      else set.delete(listaId)
+      next[conversacionId] = set
+      return next
+    })
+    try {
+      if (checked) {
+        await addConversationToList(supabase, conversacionId, listaId)
+      } else {
+        await removeConversationFromList(supabase, conversacionId, listaId)
+      }
+    } catch (err) {
+      alert(err.message || 'No se pudo actualizar la lista.')
+    }
+  }
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return conversations.filter((c) => {
+      const matchesSearch =
+        !q ||
+        (c.nombre_cliente || '').toLowerCase().includes(q) ||
+        (c.numero_whatsapp || '').toLowerCase().includes(q)
+      if (!matchesSearch) return false
+
+      if (activeTab === 'todos') return true
+      if (activeTab === 'no_leidos') return isUnread(c)
+      if (activeTab === 'humano') return c.modo === 'humano'
+      if (activeTab === 'bot') return c.modo !== 'humano'
+      return membership[c.id]?.has(activeTab) ?? false
+    })
+  }, [conversations, search, activeTab, membership, unreadTick])
 
   return (
     <div className="conversation-list">
@@ -166,7 +495,10 @@ export default function ConversationList({ selectedId, onSelect }) {
           <button
             type="button"
             className="header-menu-toggle"
-            onClick={() => setShowMenu((v) => !v)}
+            onClick={() => {
+              setOpenSwipeId(null)
+              setShowMenu((v) => !v)
+            }}
             aria-label="Más opciones"
           >
             ⋮
@@ -194,12 +526,53 @@ export default function ConversationList({ selectedId, onSelect }) {
           placeholder="Buscar conversación"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          onFocus={() => setOpenSwipeId(null)}
         />
+      </div>
+      <div className="list-tabs">
+        {FIXED_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={`list-tab ${activeTab === tab.id ? 'active' : ''}`}
+            onClick={() => {
+              setOpenSwipeId(null)
+              setActiveTab(tab.id)
+            }}
+          >
+            {tab.nombre}
+          </button>
+        ))}
+        {customLists.map((list) => (
+          <button
+            key={list.id}
+            type="button"
+            className={`list-tab ${activeTab === list.id ? 'active' : ''}`}
+            onClick={() => {
+              setOpenSwipeId(null)
+              setActiveTab(list.id)
+            }}
+          >
+            {list.nombre}
+          </button>
+        ))}
+        <button
+          type="button"
+          className="list-tab list-tab-add"
+          onClick={() => {
+            setOpenSwipeId(null)
+            setManageListsOpen(true)
+          }}
+          aria-label="Gestionar listas"
+          title="Gestionar listas"
+        >
+          +
+        </button>
       </div>
       <div className="conversation-items">
         {loading && <p className="empty-hint">Cargando...</p>}
         {!loading && filtered.length === 0 && (
-          <p className="empty-hint">Sin conversaciones todavía.</p>
+          <p className="empty-hint">Sin conversaciones en esta lista.</p>
         )}
         {filtered.map((c) => {
           const unread = unreadTick >= 0 && selectedId !== c.id && isUnread(c)
@@ -208,33 +581,45 @@ export default function ConversationList({ selectedId, onSelect }) {
             ? `${last.remitente === 'cliente' ? '' : '↳ '}${last.contenido}`
             : 'Sin mensajes'
           return (
-            <button
+            <ConversationRow
               key={c.id}
-              className={`conversation-item ${selectedId === c.id ? 'active' : ''}`}
-              onClick={() => onSelect(c)}
-            >
-              <div className="avatar">
-                {(c.nombre_cliente || c.numero_whatsapp || '?').charAt(0).toUpperCase()}
-              </div>
-              <div className="conversation-info">
-                <div className="conversation-row">
-                  <span className={`conversation-name ${unread ? 'unread' : ''}`}>
-                    {c.nombre_cliente || c.numero_whatsapp}
-                  </span>
-                  <span className="conversation-time">{formatTime(c.actualizado_en)}</span>
-                </div>
-                <div className="conversation-row">
-                  <span className="conversation-preview">{preview}</span>
-                  <span className={`mode-badge ${c.modo === 'humano' ? 'human' : 'bot'}`}>
-                    {c.modo === 'humano' ? 'Humano' : 'Bot'}
-                  </span>
-                </div>
-              </div>
-              {unread && <span className="unread-dot" />}
-            </button>
+              conversation={c}
+              selected={selectedId === c.id}
+              unread={unread}
+              preview={preview}
+              time={formatTime(c.actualizado_en)}
+              swipeOpen={openSwipeId === c.id}
+              onSwipeOpen={setOpenSwipeId}
+              onSwipeClose={() => setOpenSwipeId(null)}
+              onSelect={onSelect}
+              onOpenAddToList={(conv) => {
+                setOpenSwipeId(null)
+                setAddToListTarget(conv)
+              }}
+            />
           )
         })}
       </div>
+
+      {addToListTarget && (
+        <AddToListModal
+          conversation={addToListTarget}
+          lists={customLists}
+          membership={membership}
+          onToggle={handleToggleMembership}
+          onClose={() => setAddToListTarget(null)}
+          onCreateList={handleCreateList}
+        />
+      )}
+
+      {manageListsOpen && (
+        <ManageListsModal
+          lists={customLists}
+          onClose={() => setManageListsOpen(false)}
+          onCreateList={handleCreateList}
+          onDeleteList={handleDeleteList}
+        />
+      )}
     </div>
   )
 }
