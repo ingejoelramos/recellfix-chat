@@ -232,7 +232,6 @@ function ManageListsModal({ lists, onClose, onCreateList, onDeleteList }) {
 
 export default function ConversationList({ selectedId, onSelect }) {
   const [conversations, setConversations] = useState([])
-  const [lastMessages, setLastMessages] = useState({})
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [showMenu, setShowMenu] = useState(false)
@@ -266,19 +265,6 @@ export default function ConversationList({ selectedId, onSelect }) {
         setConversations(data || [])
       }
       setLoading(false)
-
-      const { data: recentMessages } = await supabase
-        .from('mensajes')
-        .select('conversacion_id, contenido, remitente, creado_en')
-        .order('creado_en', { ascending: false })
-        .limit(300)
-      if (active && recentMessages) {
-        const map = {}
-        for (const m of recentMessages) {
-          if (!map[m.conversacion_id]) map[m.conversacion_id] = m
-        }
-        setLastMessages(map)
-      }
 
       try {
         const [lists, memberships] = await Promise.all([fetchLists(supabase), fetchMemberships(supabase)])
@@ -321,7 +307,6 @@ export default function ConversationList({ selectedId, onSelect }) {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'mensajes' },
         (payload) => {
-          setLastMessages((prev) => ({ ...prev, [payload.new.conversacion_id]: payload.new }))
           if (payload.new.remitente === 'cliente') {
             playNotificationSound()
           }
@@ -576,9 +561,8 @@ export default function ConversationList({ selectedId, onSelect }) {
         )}
         {filtered.map((c) => {
           const unread = unreadTick >= 0 && selectedId !== c.id && isUnread(c)
-          const last = lastMessages[c.id]
-          const preview = last
-            ? `${last.remitente === 'cliente' ? '' : '↳ '}${last.contenido}`
+          const preview = c.ultimo_mensaje_contenido
+            ? `${c.ultimo_mensaje_remitente === 'cliente' ? '' : '↳ '}${c.ultimo_mensaje_contenido}`
             : 'Sin mensajes'
           return (
             <ConversationRow
