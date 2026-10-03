@@ -466,6 +466,8 @@ input {
   align-items: center;
   justify-content: center;
   color: var(--wa-text-muted);
+  background-color: #2e2f2f;
+  background-image: none;
 }
 
 .chat-header {
