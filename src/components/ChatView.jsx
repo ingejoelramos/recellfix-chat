@@ -80,6 +80,7 @@ export default function ChatView({ conversation, onClose }) {
   const [sending, setSending] = useState(false)
   const [toggling, setToggling] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [avatarColor, setAvatarColor] = useState(undefined)
   const bottomRef = useRef(null)
   const textareaRef = useRef(null)
 
@@ -138,6 +139,58 @@ export default function ChatView({ conversation, onClose }) {
     return () => {
       active = false
       supabase.removeChannel(channel)
+    }
+  }, [conversation?.id])
+
+  useEffect(() => {
+    if (!conversation) {
+      setAvatarColor(undefined)
+      return
+    }
+    const supabase = getSupabaseClient()
+    let active = true
+
+    async function loadAvatarColor() {
+      const { data: memberships } = await supabase
+        .from('conversacion_listas')
+        .select('lista_id')
+        .eq('conversacion_id', conversation.id)
+
+      if (!active) return
+      if (!memberships || memberships.length === 0) {
+        setAvatarColor(undefined)
+        return
+      }
+
+      const listaIds = memberships.map((m) => m.lista_id)
+      const { data: lists } = await supabase
+        .from('listas_chat')
+        .select('id, color')
+        .in('id', listaIds)
+        .order('creado_en', { ascending: true })
+
+      if (!active) return
+      setAvatarColor(lists?.[0]?.color)
+    }
+    loadAvatarColor()
+
+    const listsChannel = supabase
+      .channel(`conversacion-listas-${conversation.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'conversacion_listas',
+          filter: `conversacion_id=eq.${conversation.id}`,
+        },
+        () => loadAvatarColor()
+      )
+      .subscribe()
+
+    return () => {
+      active = false
+      supabase.removeChannel(listsChannel)
     }
   }, [conversation?.id])
 
@@ -264,10 +317,10 @@ export default function ChatView({ conversation, onClose }) {
         >
           ←
         </button>
-        <div className="avatar">
-          {(liveConversation.nombre_cliente || liveConversation.numero_whatsapp || '?')
-            .charAt(0)
-            .toUpperCase()}
+        <div className="avatar" style={avatarColor ? { background: avatarColor } : undefined}>
+          {liveConversation.nombre_cliente?.trim()
+            ? liveConversation.nombre_cliente.trim().charAt(0).toUpperCase()
+            : '?'}
         </div>
         <div className="chat-header-info">
           <span className="chat-header-name">
