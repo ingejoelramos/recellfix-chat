@@ -553,7 +553,10 @@ export default function ConversationList({ selectedId, onSelect }) {
   return (
     <div className="conversation-list">
       <div className="conversation-list-header">
-        <h2>RecellFix Agent</h2>
+        <h2>
+          <img src="/favicon-512.png" alt="" className="header-logo" />
+          RecellFix Agent
+        </h2>
         <div className="header-menu" ref={menuRef}>
           <button
             type="button"

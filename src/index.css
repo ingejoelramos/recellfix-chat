@@ -1,11 +1,11 @@
 :root {
   --wa-dark: #2e2f2f;
   --wa-panel: #161717;
-  --wa-panel-header: #2e2f2f;
+  --wa-panel-header: #161717;
   --wa-bg-chat: #161717;
   --wa-bubble-in: #2e2f2f;
   --wa-bubble-out: #005c4b;
-  --wa-green: #00a884;
+  --wa-green: #21c063;
   --wa-text: #e9edef;
   --wa-text-muted: #8696a0;
   --wa-border: #2a3942;
@@ -188,6 +188,16 @@ input {
 .conversation-list-header h2 {
   margin: 0;
   font-size: 17px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-logo {
+  height: 28px;
+  width: 28px;
+  flex-shrink: 0;
+  object-fit: contain;
 }
 
 .header-menu {
@@ -197,8 +207,8 @@ input {
 .header-menu-toggle {
   background: none;
   border: none;
-  color: var(--wa-text-muted);
-  font-size: 20px;
+  color: #ffffff;
+  font-size: 23px;
   line-height: 1;
   padding: 4px 8px;
   border-radius: 6px;
