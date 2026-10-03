@@ -1,15 +1,15 @@
 :root {
-  --wa-dark: #202c33;
-  --wa-panel: #111b21;
-  --wa-panel-header: #202c33;
-  --wa-bg-chat: #0b141a;
-  --wa-bubble-in: #202c33;
+  --wa-dark: #2e2f2f;
+  --wa-panel: #161717;
+  --wa-panel-header: #2e2f2f;
+  --wa-bg-chat: #161717;
+  --wa-bubble-in: #2e2f2f;
   --wa-bubble-out: #005c4b;
   --wa-green: #00a884;
   --wa-text: #e9edef;
   --wa-text-muted: #8696a0;
   --wa-border: #2a3942;
-  --wa-hover: #202c33;
+  --wa-hover: #2e2f2f;
   --avatar-default: #56707c;
   --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
