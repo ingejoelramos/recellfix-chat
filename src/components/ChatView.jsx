@@ -37,6 +37,12 @@ function groupByDay(messages) {
   return groups
 }
 
+function formatDuration(totalSeconds) {
+  const m = Math.floor(totalSeconds / 60)
+  const s = totalSeconds % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
 function bubbleInfo(remitente) {
   if (remitente === 'cliente') {
     return { side: 'incoming', label: null }
@@ -117,9 +123,15 @@ export default function ChatView({ conversation, onClose }) {
   const [toggling, setToggling] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [avatarColor, setAvatarColor] = useState(undefined)
+  const [recording, setRecording] = useState(false)
+  const [recordingSeconds, setRecordingSeconds] = useState(0)
   const bottomRef = useRef(null)
   const textareaRef = useRef(null)
   const fileInputRef = useRef(null)
+  const mediaRecorderRef = useRef(null)
+  const audioChunksRef = useRef([])
+  const recordingIntervalRef = useRef(null)
+  const streamRef = useRef(null)
 
   useEffect(() => {
     setLiveConversation(conversation)
@@ -387,6 +399,116 @@ export default function ChatView({ conversation, onClose }) {
     setUploading(false)
   }
 
+  async function sendAudioBlob(blob, mimeType) {
+    if (!conversation) return
+    setUploading(true)
+    const supabase = getSupabaseClient()
+    const ext = mimeType.includes('webm') ? 'webm' : 'mp4'
+    const path = `humano/${conversation.id}/${Date.now()}-audio.${ext}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('whatsapp-media')
+      .upload(path, blob, { contentType: mimeType, upsert: false })
+
+    if (uploadError) {
+      console.error(uploadError)
+      alert('No se pudo subir el audio: ' + uploadError.message)
+      setUploading(false)
+      return
+    }
+
+    const { data: publicUrlData } = supabase.storage.from('whatsapp-media').getPublicUrl(path)
+    const mediaUrl = publicUrlData.publicUrl
+
+    const { data: inserted, error } = await supabase
+      .from('mensajes')
+      .insert({
+        conversacion_id: conversation.id,
+        remitente: 'humano',
+        contenido: '',
+        tipo: 'audio',
+        media_url: mediaUrl,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error(error)
+    }
+
+    const webhookUrl = getSendWebhookUrl()
+    if (webhookUrl) {
+      try {
+        await fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            numero_whatsapp: conversation.numero_whatsapp,
+            conversacion_id: conversation.id,
+            contenido: '',
+            tipo: 'audio',
+            media_url: mediaUrl,
+            mensaje_id: inserted?.id ?? null,
+          }),
+        })
+      } catch (err) {
+        console.error('Error enviando a n8n:', err)
+      }
+    }
+    setUploading(false)
+  }
+
+  async function handleMicClick() {
+    if (!isHumano || uploading) return
+    if (recording) {
+      mediaRecorderRef.current?.stop()
+      return
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : 'audio/mp4'
+      const recorder = new MediaRecorder(stream, { mimeType })
+      audioChunksRef.current = []
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data)
+      }
+      recorder.onstop = () => {
+        streamRef.current?.getTracks().forEach((track) => track.stop())
+        clearInterval(recordingIntervalRef.current)
+        setRecording(false)
+        setRecordingSeconds(0)
+        const wasCancelled = mediaRecorderRef.current?._cancelled
+        const blob = new Blob(audioChunksRef.current, { type: mimeType })
+        audioChunksRef.current = []
+        if (!wasCancelled && blob.size > 0) {
+          sendAudioBlob(blob, mimeType)
+        }
+      }
+
+      mediaRecorderRef.current = recorder
+      recorder.start()
+      setRecording(true)
+      setRecordingSeconds(0)
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingSeconds((s) => s + 1)
+      }, 1000)
+    } catch (err) {
+      console.error(err)
+      alert('No se pudo acceder al micrófono: ' + err.message)
+    }
+  }
+
+  function handleCancelRecording() {
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current._cancelled = true
+      mediaRecorderRef.current.stop()
+    }
+  }
+
   function handleInsertEmoji(emoji) {
     const el = textareaRef.current
     if (!el) {
@@ -510,7 +632,7 @@ export default function ChatView({ conversation, onClose }) {
         <button
           type="button"
           className="attach-button"
-          disabled={!isHumano || uploading}
+          disabled={!isHumano || uploading || recording}
           onClick={handleAttachClick}
           aria-label="Adjuntar archivo"
         >
@@ -532,7 +654,7 @@ export default function ChatView({ conversation, onClose }) {
           <button
             type="button"
             className="emoji-toggle"
-            disabled={!isHumano}
+            disabled={!isHumano || recording}
             onClick={() => setShowEmojiPicker((v) => !v)}
             aria-label="Insertar emoji"
           >
@@ -544,25 +666,65 @@ export default function ChatView({ conversation, onClose }) {
             </svg>
           </button>
         </div>
-        <textarea
-          ref={textareaRef}
-          rows={1}
-          placeholder={isHumano ? 'Escribe un mensaje' : 'Activa modo Humano para escribir'}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onFocus={() => setShowEmojiPicker(false)}
-          disabled={!isHumano}
-        />
-        <button
-          type="submit"
-          className="send-button"
-          disabled={sending || !draft.trim() || !isHumano}
-          aria-label="Enviar mensaje"
-        >
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-            <path d="M3.4 20.6c-.4.2-.9.1-1.2-.2-.3-.3-.4-.8-.2-1.2L5.5 12 2 4.8c-.2-.4-.1-.9.2-1.2.3-.3.8-.4 1.2-.2l17 8a1 1 0 0 1 0 1.8l-17 8z" />
-          </svg>
-        </button>
+        {recording ? (
+          <div className="recording-bar">
+            <button
+              type="button"
+              className="cancel-recording-button"
+              onClick={handleCancelRecording}
+              aria-label="Cancelar grabación"
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 6h14M9 6V4h6v2M7 6l1 14h8l1-14" />
+              </svg>
+            </button>
+            <span className="recording-dot" />
+            <span className="recording-timer">{formatDuration(recordingSeconds)}</span>
+          </div>
+        ) : (
+          <textarea
+            ref={textareaRef}
+            rows={1}
+            placeholder={isHumano ? 'Escribe un mensaje' : 'Activa modo Humano para escribir'}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onFocus={() => setShowEmojiPicker(false)}
+            disabled={!isHumano}
+          />
+        )}
+        {draft.trim() ? (
+          <button
+            type="submit"
+            className="send-button"
+            disabled={sending || !isHumano}
+            aria-label="Enviar mensaje"
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M3.4 20.6c-.4.2-.9.1-1.2-.2-.3-.3-.4-.8-.2-1.2L5.5 12 2 4.8c-.2-.4-.1-.9.2-1.2.3-.3.8-.4 1.2-.2l17 8a1 1 0 0 1 0 1.8l-17 8z" />
+            </svg>
+          </button>
+        ) : (
+          <button
+            type="button"
+            className={`send-button mic-button ${recording ? 'recording' : ''}`}
+            disabled={!isHumano || uploading}
+            onClick={handleMicClick}
+            aria-label={recording ? 'Detener y enviar audio' : 'Grabar audio'}
+          >
+            {recording ? (
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <rect x="5" y="5" width="14" height="14" rx="2" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="2" width="6" height="12" rx="3" />
+                <path d="M5 11a7 7 0 0 0 14 0" />
+                <path d="M12 18v3" />
+                <path d="M9 21h6" />
+              </svg>
+            )}
+          </button>
+        )}
       </form>
     </div>
   )

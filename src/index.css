@@ -838,8 +838,62 @@ input {
   margin-left: -1px;
 }
 
+.mic-button svg {
+  margin-left: 0;
+}
+
+.send-button.recording {
+  background: #f15c6d;
+}
+
 .message-input-bar button:disabled {
   opacity: 0.5;
+}
+
+.recording-bar {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--wa-dark);
+  border-radius: 20px;
+  padding: 0 14px;
+  height: 40px;
+}
+
+.cancel-recording-button {
+  background: none;
+  border: none;
+  color: var(--wa-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  height: 24px;
+  width: 24px;
+}
+
+.recording-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f15c6d;
+  animation: recording-pulse 1s ease-in-out infinite;
+}
+
+.recording-timer {
+  color: var(--wa-text);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes recording-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
 }
 
 .webhook-warning {
