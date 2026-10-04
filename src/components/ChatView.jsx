@@ -273,13 +273,6 @@ export default function ChatView({ conversation, onClose }) {
     })
   }
 
-  function handleKeyDown(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSend(e)
-    }
-  }
-
   async function handleToggleMode() {
     if (!conversation) return
     setToggling(true)
@@ -396,12 +389,18 @@ export default function ChatView({ conversation, onClose }) {
           placeholder={isHumano ? 'Escribe un mensaje' : 'Activa modo Humano para escribir'}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={handleKeyDown}
           onFocus={() => setShowEmojiPicker(false)}
           disabled={!isHumano}
         />
-        <button type="submit" disabled={sending || !draft.trim() || !isHumano}>
-          Enviar
+        <button
+          type="submit"
+          className="send-button"
+          disabled={sending || !draft.trim() || !isHumano}
+          aria-label="Enviar mensaje"
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path d="M3.4 20.6c-.4.2-.9.1-1.2-.2-.3-.3-.4-.8-.2-1.2L5.5 12 2 4.8c-.2-.4-.1-.9.2-1.2.3-.3.8-.4 1.2-.2l17 8a1 1 0 0 1 0 1.8l-17 8z" />
+          </svg>
         </button>
       </form>
     </div>
