@@ -360,6 +360,7 @@ export default function ConversationList({ selectedId, onSelect }) {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'conversaciones' },
         (payload) => {
+          console.log('[Realtime] conversaciones payload:', payload)
           setConversations((prev) => {
             if (payload.eventType === 'DELETE') {
               return prev.filter((c) => c.id !== payload.old.id)
@@ -384,7 +385,9 @@ export default function ConversationList({ selectedId, onSelect }) {
           }
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        console.log('[Realtime] canal conversaciones-realtime status:', status)
+      })
 
     const listsChannel = supabase
       .channel('listas-chat-realtime')
