@@ -1,8 +1,38 @@
 import { useEffect, useRef, useState } from 'react'
+import { Mp3Encoder } from '@breezystack/lamejs'
 import { getSupabaseClient } from '../lib/supabaseClient'
 import { getSendWebhookUrl } from '../lib/n8nConfig'
 import { markSeen } from '../lib/readTracking'
 import EmojiPicker from './EmojiPicker'
+
+async function convertBlobToMp3(blob) {
+  const arrayBuffer = await blob.arrayBuffer()
+  const AudioContextCtor = window.AudioContext || window.webkitAudioContext
+  const audioCtx = new AudioContextCtor()
+  const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer)
+  const sampleRate = audioBuffer.sampleRate
+  const floatSamples = audioBuffer.getChannelData(0)
+
+  const pcmSamples = new Int16Array(floatSamples.length)
+  for (let i = 0; i < floatSamples.length; i++) {
+    const s = Math.max(-1, Math.min(1, floatSamples[i]))
+    pcmSamples[i] = s < 0 ? s * 0x8000 : s * 0x7fff
+  }
+
+  const encoder = new Mp3Encoder(1, sampleRate, 64)
+  const blockSize = 1152
+  const mp3Chunks = []
+  for (let i = 0; i < pcmSamples.length; i += blockSize) {
+    const chunk = pcmSamples.subarray(i, i + blockSize)
+    const encoded = encoder.encodeBuffer(chunk)
+    if (encoded.length > 0) mp3Chunks.push(encoded)
+  }
+  const final = encoder.flush()
+  if (final.length > 0) mp3Chunks.push(final)
+
+  await audioCtx.close()
+  return new Blob(mp3Chunks, { type: 'audio/mpeg' })
+}
 
 function formatTime(iso) {
   if (!iso) return ''
@@ -403,7 +433,7 @@ export default function ChatView({ conversation, onClose }) {
     if (!conversation) return
     setUploading(true)
     const supabase = getSupabaseClient()
-    const ext = mimeType.includes('webm') ? 'webm' : 'mp4'
+    const ext = mimeType.includes('mpeg') ? 'mp3' : mimeType.includes('mp4') ? 'm4a' : 'webm'
     const path = `humano/${conversation.id}/${Date.now()}-audio.${ext}`
 
     const { error: uploadError } = await supabase.storage
@@ -476,16 +506,29 @@ export default function ChatView({ conversation, onClose }) {
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) audioChunksRef.current.push(e.data)
       }
-      recorder.onstop = () => {
+      recorder.onstop = async () => {
         streamRef.current?.getTracks().forEach((track) => track.stop())
         clearInterval(recordingIntervalRef.current)
         setRecording(false)
         setRecordingSeconds(0)
         const wasCancelled = mediaRecorderRef.current?._cancelled
-        const blob = new Blob(audioChunksRef.current, { type: mimeType })
+        const rawBlob = new Blob(audioChunksRef.current, { type: mimeType })
         audioChunksRef.current = []
-        if (!wasCancelled && blob.size > 0) {
-          sendAudioBlob(blob, mimeType)
+        if (wasCancelled || rawBlob.size === 0) return
+
+        if (mimeType.includes('webm')) {
+          // WhatsApp no acepta audio/webm: lo convertimos a mp3 antes de subir.
+          setUploading(true)
+          try {
+            const mp3Blob = await convertBlobToMp3(rawBlob)
+            await sendAudioBlob(mp3Blob, 'audio/mpeg')
+          } catch (err) {
+            console.error('Error convirtiendo audio a mp3:', err)
+            alert('No se pudo procesar el audio grabado.')
+            setUploading(false)
+          }
+        } else {
+          await sendAudioBlob(rawBlob, mimeType)
         }
       }
 
