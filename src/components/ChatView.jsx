@@ -225,12 +225,16 @@ export default function ChatView({ conversation, onClose }) {
     const contenido = draft.trim()
     setDraft('')
 
-    const { error } = await supabase.from('mensajes').insert({
-      conversacion_id: conversation.id,
-      remitente: 'humano',
-      contenido,
-      tipo: 'texto',
-    })
+    const { data: inserted, error } = await supabase
+      .from('mensajes')
+      .insert({
+        conversacion_id: conversation.id,
+        remitente: 'humano',
+        contenido,
+        tipo: 'texto',
+      })
+      .select()
+      .single()
 
     if (error) {
       console.error(error)
@@ -246,6 +250,7 @@ export default function ChatView({ conversation, onClose }) {
             numero_whatsapp: conversation.numero_whatsapp,
             conversacion_id: conversation.id,
             contenido,
+            mensaje_id: inserted?.id ?? null,
           }),
         })
       } catch (err) {
