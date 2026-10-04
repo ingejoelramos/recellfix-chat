@@ -380,7 +380,12 @@ export default function ChatView({ conversation, onClose }) {
             onClick={() => setShowEmojiPicker((v) => !v)}
             aria-label="Insertar emoji"
           >
-            😊
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="9.5" />
+              <path d="M8.3 14.2c1 1.2 2.3 1.8 3.7 1.8s2.7-.6 3.7-1.8" />
+              <circle cx="8.7" cy="9.8" r="1" fill="currentColor" stroke="none" />
+              <circle cx="15.3" cy="9.8" r="1" fill="currentColor" stroke="none" />
+            </svg>
           </button>
         </div>
         <textarea

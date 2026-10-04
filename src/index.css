@@ -691,6 +691,7 @@ input {
   border-radius: 50%;
   border: none;
   background: var(--wa-dark);
+  color: var(--wa-text-muted);
   font-size: 18px;
   display: flex;
   align-items: center;
