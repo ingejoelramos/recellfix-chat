@@ -113,11 +113,13 @@ export default function ChatView({ conversation, onClose }) {
   const [messages, setMessages] = useState([])
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [toggling, setToggling] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [avatarColor, setAvatarColor] = useState(undefined)
   const bottomRef = useRef(null)
   const textareaRef = useRef(null)
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
     setLiveConversation(conversation)
@@ -308,6 +310,83 @@ export default function ChatView({ conversation, onClose }) {
     textareaRef.current?.focus()
   }
 
+  function detectTipo(file) {
+    if (file.type.startsWith('image/')) return 'imagen'
+    if (file.type.startsWith('video/')) return 'video'
+    if (file.type.startsWith('audio/')) return 'audio'
+    return 'documento'
+  }
+
+  function handleAttachClick() {
+    if (liveConversation?.modo !== 'humano' || uploading) return
+    fileInputRef.current?.click()
+  }
+
+  async function handleFileChange(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    const isHumano = liveConversation?.modo === 'humano'
+    if (!file || !conversation || !isHumano) return
+
+    setUploading(true)
+    const supabase = getSupabaseClient()
+    const tipo = detectTipo(file)
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+    const path = `humano/${conversation.id}/${Date.now()}-${safeName}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('whatsapp-media')
+      .upload(path, file, { contentType: file.type || undefined, upsert: false })
+
+    if (uploadError) {
+      console.error(uploadError)
+      alert('No se pudo subir el archivo: ' + uploadError.message)
+      setUploading(false)
+      return
+    }
+
+    const { data: publicUrlData } = supabase.storage.from('whatsapp-media').getPublicUrl(path)
+    const mediaUrl = publicUrlData.publicUrl
+    const contenido = tipo === 'documento' ? file.name : ''
+
+    const { data: inserted, error } = await supabase
+      .from('mensajes')
+      .insert({
+        conversacion_id: conversation.id,
+        remitente: 'humano',
+        contenido,
+        tipo,
+        media_url: mediaUrl,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error(error)
+    }
+
+    const webhookUrl = getSendWebhookUrl()
+    if (webhookUrl) {
+      try {
+        await fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            numero_whatsapp: conversation.numero_whatsapp,
+            conversacion_id: conversation.id,
+            contenido,
+            tipo,
+            media_url: mediaUrl,
+            mensaje_id: inserted?.id ?? null,
+          }),
+        })
+      } catch (err) {
+        console.error('Error enviando a n8n:', err)
+      }
+    }
+    setUploading(false)
+  }
+
   function handleInsertEmoji(emoji) {
     const el = textareaRef.current
     if (!el) {
@@ -421,6 +500,28 @@ export default function ChatView({ conversation, onClose }) {
       </div>
 
       <form className="message-input-bar" onSubmit={handleSend}>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
+          style={{ display: 'none' }}
+          onChange={handleFileChange}
+        />
+        <button
+          type="button"
+          className="attach-button"
+          disabled={!isHumano || uploading}
+          onClick={handleAttachClick}
+          aria-label="Adjuntar archivo"
+        >
+          {uploading ? (
+            <span className="attach-spinner" />
+          ) : (
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17.5 7.5 L8.6 16.4a3 3 0 1 1-4.2-4.2l9.5-9.5a2 2 0 1 1 2.8 2.8l-9.5 9.5a1 1 0 1 1-1.4-1.4l8.5-8.5" />
+            </svg>
+          )}
+        </button>
         <div className="emoji-anchor">
           {showEmojiPicker && (
             <EmojiPicker

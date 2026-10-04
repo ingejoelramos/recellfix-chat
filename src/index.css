@@ -710,6 +710,39 @@ input {
   height: 40px;
 }
 
+.attach-button {
+  height: 40px;
+  width: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: none;
+  background: var(--wa-dark);
+  color: var(--wa-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.attach-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.attach-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--wa-text-muted);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: attach-spin 0.7s linear infinite;
+}
+
+@keyframes attach-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .emoji-anchor {
   position: relative;
 }
