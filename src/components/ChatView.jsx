@@ -47,6 +47,41 @@ function bubbleInfo(remitente) {
   return { side: 'outgoing outgoing-bot', label: 'Alex 🤖' }
 }
 
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 16 11" width="14" height="10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 5.3 L5 9.3 L15 1" />
+    </svg>
+  )
+}
+
+function MessageStatus({ estado }) {
+  if (!estado || estado === 'enviado') {
+    return (
+      <span className="status-icon status-sent" title="Enviado">
+        <CheckIcon />
+      </span>
+    )
+  }
+  if (estado === 'fallido') {
+    return (
+      <span className="status-icon status-failed" title="No se pudo entregar">
+        !
+      </span>
+    )
+  }
+  const isRead = estado === 'leido'
+  return (
+    <span
+      className={`status-icon status-double ${isRead ? 'status-read' : 'status-delivered'}`}
+      title={isRead ? 'Leído' : 'Entregado'}
+    >
+      <CheckIcon />
+      <CheckIcon />
+    </span>
+  )
+}
+
 function MessageMedia({ tipo, url, caption }) {
   if (tipo === 'imagen') {
     return (
@@ -120,6 +155,18 @@ export default function ChatView({ conversation, onClose }) {
             return [...prev, payload.new]
           })
           markSeen(conversation.id)
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'mensajes',
+          filter: `conversacion_id=eq.${conversation.id}`,
+        },
+        (payload) => {
+          setMessages((prev) => prev.map((m) => (m.id === payload.new.id ? payload.new : m)))
         }
       )
       .on(
@@ -361,7 +408,10 @@ export default function ChatView({ conversation, onClose }) {
                   ) : (
                     <div className="message-content">{m.contenido}</div>
                   )}
-                  <div className="message-time">{formatTime(m.creado_en)}</div>
+                  <div className="message-time">
+                    {formatTime(m.creado_en)}
+                    {side.startsWith('outgoing') && <MessageStatus estado={m.estado_entrega} />}
+                  </div>
                 </div>
               )
             })}
