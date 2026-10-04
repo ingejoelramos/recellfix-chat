@@ -717,9 +717,9 @@ input {
 
 .emoji-picker-grid {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
+  grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: 2px;
-  width: 260px;
+  width: max-content;
 }
 
 .emoji-picker-item {
